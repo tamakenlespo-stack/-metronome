@@ -1,0 +1,1180 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>ギター練習用メトロノーム</title>
+<style>
+  :root{
+    --bg:#101010; --panel:#1a1a1a; --panel-2:#242424; --panel-3:#2e2e2e;
+    --text:#f4f4f4; --sub:#b8b8b8;
+    --accent:#e1b24a; --accent-dim:#8b6a25; --accent-bg:rgba(225,178,74,.13);
+    --start:#2f7a43; --stop:#8c2e2e;
+    --dot-off:#313131; --shadow:0 12px 30px rgba(0,0,0,.28); --radius:18px;
+    --section-gap:14px;
+  }
+  [data-theme="parchment"]{
+    --bg:#f2ede4; --panel:#ebe4d8; --panel-2:#ddd8cc; --panel-3:#cfc8ba;
+    --text:#28201a; --sub:#68604e;
+    --accent:#7a6038; --accent-dim:#c8a870; --accent-bg:rgba(122,96,56,.12);
+    --start:#326040; --stop:#904040;
+    --dot-off:#ccc4b4; --shadow:0 12px 30px rgba(0,0,0,.10);
+  }
+
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+  html,body{
+    margin:0; min-height:100%;
+    background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  }
+  body{
+    display:flex; align-items:center; justify-content:center;
+    min-height:100dvh;
+    padding:env(safe-area-inset-top,12px) 14px env(safe-area-inset-bottom,12px);
+  }
+
+  .app{
+    width:min(440px,100%);
+    background:var(--panel);
+    border:1px solid rgba(128,128,128,.15);
+    border-radius:24px;
+    box-shadow:var(--shadow);
+    padding:18px 16px 18px;
+  }
+
+  .top{
+    display:flex; align-items:center; justify-content:space-between;
+    gap:12px; margin-bottom:var(--section-gap);
+  }
+  .title{
+    font-size:13px; letter-spacing:.15em; text-transform:uppercase;
+    color:var(--sub); font-weight:700;
+  }
+  .beats-toggle{
+    display:flex; background:var(--panel-2); border-radius:999px;
+    padding:4px; gap:4px;
+  }
+  .beat-option{
+    min-width:64px; height:36px; border:none; border-radius:999px;
+    background:transparent; color:var(--sub);
+    font-size:15px; font-weight:700; cursor:pointer;
+  }
+  .beat-option.active{ background:var(--accent); color:#161616; }
+
+  .bpm-block{ text-align:center; margin-top:2px; }
+  .bpm-label{
+    font-size:14px; letter-spacing:.18em; color:var(--sub);
+    text-transform:uppercase; margin-bottom:6px;
+  }
+  .bpm-value-wrap{
+    display:inline-flex; flex-direction:column; align-items:center;
+    justify-content:center; min-width:200px; padding:10px 18px;
+    border-radius:20px;
+  }
+  .bpm-value-trigger{
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    width:100%; cursor:pointer; border-radius:16px;
+  }
+  .bpm-value-trigger:hover{ background:rgba(255,255,255,.03); }
+  .bpm-value{
+    font-size:clamp(78px,22vw,116px); line-height:.95; font-weight:800;
+    letter-spacing:-.05em; font-variant-numeric:tabular-nums;
+  }
+  .bpm-edit-hint{
+    font-size:13px; color:var(--sub);
+    letter-spacing:.06em; margin-top:6px; opacity:.8;
+  }
+  .bpm-input-wrap{ display:none; flex-direction:column; align-items:center; gap:6px; }
+  .bpm-value-wrap.editing .bpm-value-trigger{ display:none; }
+  .bpm-value-wrap.editing .bpm-input-wrap{ display:flex; }
+  .bpm-direct{
+    width:140px; height:76px; background:var(--panel-2);
+    border:2px solid var(--accent); border-radius:16px; color:var(--text);
+    font-size:52px; font-weight:800; text-align:center;
+    letter-spacing:-.04em; font-variant-numeric:tabular-nums;
+    outline:none; -moz-appearance:textfield;
+  }
+  .bpm-direct::-webkit-inner-spin-button,
+  .bpm-direct::-webkit-outer-spin-button{ -webkit-appearance:none; }
+  .bpm-input-actions{ display:flex; gap:8px; }
+  .bpm-confirm-btn,.bpm-cancel-btn{
+    padding:8px 20px; border-radius:999px; border:none;
+    font-size:14px; font-weight:700; cursor:pointer;
+  }
+  .bpm-confirm-btn{ background:var(--accent); color:#161616; }
+  .bpm-cancel-btn{ background:var(--panel-3); color:var(--sub); }
+
+  .beats-row{
+    display:flex;
+    justify-content:center;
+    align-items:flex-end;
+    gap:14px;
+    min-height:24px;
+    margin:12px 0 var(--section-gap);
+    flex-wrap:nowrap;
+  }
+
+  .beat-group{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    flex-shrink:0;
+  }
+
+  .beat-dot{
+    border-radius:50%;
+    background:var(--dot-off);
+    transition:transform .08s ease, background .08s ease, opacity .08s ease;
+    flex-shrink:0;
+  }
+  .beat-dot.main-dot{ width:14px; height:14px; }
+  .beat-dot.sub-dot { width:8px; height:8px; opacity:.45; }
+  .beat-dot.accent{ background:var(--accent-dim); }
+  .beat-dot.active{ background:var(--accent); transform:scale(1.35); opacity:1; }
+
+  .controls-row{
+    display:flex; align-items:center; justify-content:center;
+    gap:10px; margin-bottom:12px;
+  }
+  .step-btn{
+    border:none; background:var(--panel-2); color:var(--text);
+    border-radius:50%; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0; font-weight:700;
+  }
+  .step-btn.small{ width:52px; height:52px; font-size:18px; }
+  .step-btn.large{ width:68px; height:68px; font-size:28px; }
+  .step-btn:active{ transform:scale(.96); }
+
+  .range-wrap{ margin:4px 2px var(--section-gap); }
+  .range-head{
+    display:flex; justify-content:space-between; align-items:center;
+    margin-bottom:8px; color:var(--sub); font-size:14px; gap:8px;
+  }
+  .range-head .center-note{
+    font-size:14px; color:var(--text); font-weight:700; text-align:center;
+  }
+  input[type="range"]{
+    width:100%; display:block; margin:0;
+    accent-color:var(--accent); background:transparent;
+  }
+
+  .main-button{
+    width:100%; height:72px; border:none; border-radius:999px;
+    font-size:22px; font-weight:800; color:#fff;
+    background:var(--start); cursor:pointer;
+    margin:0 0 var(--section-gap); letter-spacing:.04em; transition:background .2s;
+  }
+  .main-button.running{ background:var(--stop); }
+  .main-button:active{ transform:scale(.985); }
+
+  .tap-btn{
+    width:100%; height:52px; border:none; border-radius:999px;
+    font-size:16px; font-weight:700;
+    background:var(--panel-2); color:var(--text);
+    cursor:pointer; margin-bottom:var(--section-gap);
+    transition:background .1s, color .1s; letter-spacing:.06em;
+  }
+  .tap-btn:active{ background:var(--panel-3); color:var(--accent); }
+
+  .subdiv-row{ display:flex; gap:6px; margin-bottom:var(--section-gap); }
+  .subdiv-btn,
+  .voice-btn,
+  .reset-btn{
+    height:44px; border:1px solid rgba(128,128,128,.2);
+    border-radius:12px; background:var(--panel-2); color:var(--sub);
+    font-size:14px; font-weight:800; cursor:pointer; transition:all .15s;
+  }
+  .subdiv-btn{ flex:1; }
+  .subdiv-btn.active,
+  .voice-btn.on{
+    background:var(--accent-bg); color:var(--accent); border-color:var(--accent);
+  }
+  .subdiv-btn:active,
+  .voice-btn:active,
+  .reset-btn:active{ transform:scale(.97); }
+
+  .section-label{
+    font-size:13px; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--sub); font-weight:700; margin-bottom:10px;
+  }
+  .favorites-row{
+    display:flex; gap:8px; flex-wrap:nowrap; margin-bottom:var(--section-gap);
+    min-height:46px; align-items:center; overflow:hidden;
+  }
+  .fav-chip{
+    display:flex; align-items:center;
+    background:var(--panel-2); border:1px solid rgba(128,128,128,.2);
+    border-radius:999px; overflow:hidden;
+    height:46px; cursor:pointer; flex:1; min-width:0;
+    transition:border-color .15s;
+  }
+  .fav-chip:hover{ border-color:var(--accent-dim); }
+  .fav-chip-bpm{
+    flex:1; padding:0 8px; font-size:17px; font-weight:700;
+    color:var(--text); text-align:center;
+  }
+  .fav-chip-del{
+    width:36px; height:100%; border:none; background:transparent;
+    color:var(--sub); font-size:17px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition:color .15s, background .15s;
+  }
+  .fav-chip-del:hover{ color:#e05a5a; background:rgba(200,60,60,.12); }
+  .fav-add-btn{
+    height:46px; padding:0 14px;
+    border:1px dashed rgba(128,128,128,.3); border-radius:999px;
+    background:transparent; color:var(--sub);
+    font-size:14px; font-weight:700; cursor:pointer;
+    transition:border-color .15s, color .15s; white-space:nowrap;
+    display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .fav-add-btn:hover{ border-color:var(--accent-dim); color:var(--accent); }
+  .fav-empty{ font-size:14px; color:var(--sub); opacity:.6; }
+
+  .voice-row{ display:flex; gap:8px; margin-bottom:var(--section-gap); }
+  .voice-btn{ width:100%; }
+
+  .slowup-box{
+    background:var(--panel-2); border-radius:var(--radius);
+    padding:14px; margin-bottom:var(--section-gap);
+  }
+  .slowup-header{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+  }
+  .slowup-title{ font-size:15px; font-weight:700; color:var(--text); }
+  .slowup-subtitle{ font-size:13px; color:var(--sub); margin-top:3px; }
+  .toggle-switch{ position:relative; width:44px; height:26px; flex-shrink:0; }
+  .toggle-switch input{ opacity:0; width:0; height:0; }
+  .toggle-track{
+    position:absolute; inset:0; background:#3a3a3a;
+    border-radius:999px; cursor:pointer; transition:background .2s;
+  }
+  .toggle-track::after{
+    content:""; position:absolute; width:20px; height:20px; border-radius:50%;
+    background:#fff; top:3px; left:3px; transition:transform .2s;
+  }
+  .toggle-switch input:checked + .toggle-track{ background:var(--accent); }
+  .toggle-switch input:checked + .toggle-track::after{ transform:translateX(18px); }
+  .slowup-settings{
+    display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:12px;
+  }
+  .slowup-settings.hidden{ display:none; }
+  .su-field label{
+    font-size:13px; color:var(--sub);
+    display:block; margin-bottom:5px; line-height:1.4;
+  }
+  .su-hint{ font-size:11px; color:var(--sub); font-weight:400; }
+  .su-field input[type="number"]{
+    width:100%; height:40px; background:var(--panel-3);
+    border:1px solid rgba(128,128,128,.2); border-radius:10px;
+    color:var(--text); font-size:16px; font-weight:700;
+    text-align:center; outline:none; -moz-appearance:textfield;
+  }
+  .su-field input[type="number"]::-webkit-inner-spin-button,
+  .su-field input[type="number"]::-webkit-outer-spin-button{ -webkit-appearance:none; }
+  .su-field input[type="number"]:focus{ border-color:var(--accent); }
+  .slowup-status{
+    margin-top:10px; font-size:14px; color:var(--accent); font-weight:700;
+    display:none; text-align:center; letter-spacing:.04em;
+  }
+  .slowup-status.visible{ display:block; }
+
+  .bottom{
+    display:grid; grid-template-columns:1fr auto;
+    gap:12px; align-items:center; margin-bottom:var(--section-gap);
+  }
+  .volume-box{ background:var(--panel-2); border-radius:var(--radius); padding:12px 14px; }
+  .volume-head{
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:8px;
+  }
+  .volume-head .label{ color:var(--sub); font-weight:700; font-size:14px; }
+  .volume-head .value{
+    font-variant-numeric:tabular-nums; color:var(--text); font-weight:700; font-size:14px;
+  }
+  .accent-btn{
+    height:100%; min-width:148px;
+    border:1px solid rgba(128,128,128,.2); border-radius:var(--radius);
+    background:var(--panel-2); color:var(--sub);
+    font-size:15px; font-weight:800; cursor:pointer; padding:0 14px;
+    transition:background .15s, color .15s, border-color .15s;
+  }
+  .accent-btn.on{
+    background:var(--accent-bg); color:var(--accent); border-color:var(--accent);
+  }
+  .accent-btn:active{ transform:scale(.98); }
+
+  .reset-btn{
+    width:100%; margin-bottom:var(--section-gap);
+  }
+
+  .theme-row{ display:flex; gap:10px; justify-content:center; }
+  .theme-dot{
+    width:28px; height:28px; border-radius:50%;
+    border:2px solid transparent; cursor:pointer;
+    transition:transform .15s, border-color .15s; flex-shrink:0;
+  }
+  .theme-dot:hover{ transform:scale(1.15); }
+  .theme-dot.active{ border-color:var(--text); transform:scale(1.15); }
+  .theme-dot[data-theme="dark"]{ background:radial-gradient(circle at 35% 35%, #e1b24a, #101010); }
+  .theme-dot[data-theme="parchment"]{ background:radial-gradient(circle at 35% 35%, #c8a870, #f2ede4); }
+
+  .sr-only{
+    position:absolute; width:1px; height:1px; padding:0;
+    margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
+  }
+</style>
+</head>
+<body>
+<main class="app" id="appRoot">
+
+  <div class="top">
+    <div class="title">Metronome</div>
+    <div class="beats-toggle">
+      <button type="button" class="beat-option" id="beat3Btn">3/4</button>
+      <button type="button" class="beat-option active" id="beat4Btn">4/4</button>
+    </div>
+  </div>
+
+  <section class="bpm-block">
+    <div class="bpm-label">BPM</div>
+    <div class="bpm-value-wrap" id="bpmValueWrap" tabindex="0" aria-label="BPMを直接入力">
+      <div class="bpm-value-trigger" id="bpmValueTrigger">
+        <div class="bpm-value" id="bpmValue">120</div>
+        <div class="bpm-edit-hint" id="bpmEditHint">数字をタップして直接入力</div>
+      </div>
+      <form class="bpm-input-wrap" id="bpmInputForm">
+        <input type="number" class="bpm-direct" id="bpmDirect" min="40" max="240" inputmode="numeric" enterkeyhint="done" />
+        <div class="bpm-input-actions">
+          <button type="submit" class="bpm-confirm-btn" id="bpmConfirmBtn">確定</button>
+          <button type="button" class="bpm-cancel-btn" id="bpmCancelBtn">キャンセル</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <div class="beats-row" id="beatsRow" aria-hidden="true"></div>
+
+  <div class="controls-row">
+    <button type="button" class="step-btn large" id="minus10Btn">−10</button>
+    <button type="button" class="step-btn small" id="minus1Btn">−1</button>
+    <button type="button" class="step-btn small" id="plus1Btn">+1</button>
+    <button type="button" class="step-btn large" id="plus10Btn">+10</button>
+  </div>
+
+  <div class="range-wrap">
+    <div class="range-head">
+      <span>40</span>
+      <span class="center-note">スライダー調整</span>
+      <span>240</span>
+    </div>
+    <label class="sr-only" for="bpmSlider">BPM</label>
+    <input type="range" id="bpmSlider" min="40" max="240" step="1" value="120">
+  </div>
+
+  <button type="button" class="main-button" id="startStopBtn">▶ スタート</button>
+
+  <button type="button" class="tap-btn" id="tapBtn">♩ TAP TEMPO</button>
+
+  <div class="subdiv-row">
+    <button type="button" class="subdiv-btn active" data-sub="1">4分</button>
+    <button type="button" class="subdiv-btn" data-sub="2">8分</button>
+    <button type="button" class="subdiv-btn" data-sub="4">16分</button>
+    <button type="button" class="subdiv-btn" data-sub="3">3連</button>
+  </div>
+
+  <div class="section-label">お気に入り BPM <span id="favCount" style="font-weight:400;font-size:12px"></span></div>
+  <div class="favorites-row" id="favoritesRow">
+    <span class="fav-empty" id="favEmpty">まだ保存なし</span>
+    <button type="button" class="fav-add-btn" id="favAddBtn">＋ 保存</button>
+  </div>
+
+  <div class="voice-row">
+    <button type="button" class="voice-btn" id="voiceToggleBtn">ボイス OFF</button>
+  </div>
+
+  <div class="slowup-box">
+    <div class="slowup-header">
+      <div>
+        <div class="slowup-title">スローアップ練習</div>
+        <div class="slowup-subtitle">一定小節ごとにBPMを自動で上げる</div>
+      </div>
+      <label class="toggle-switch">
+        <input type="checkbox" id="slowupToggle">
+        <div class="toggle-track"></div>
+      </label>
+    </div>
+    <div class="slowup-settings hidden" id="slowupSettings">
+      <div class="su-field">
+        <label for="suTarget">目標 BPM<br><span class="su-hint">ここまで上げる</span></label>
+        <input type="number" id="suTarget" value="160" min="41" max="240">
+      </div>
+      <div class="su-field">
+        <label for="suStep">増加量<br><span class="su-hint">1回に＋何BPM</span></label>
+        <input type="number" id="suStep" value="5" min="1" max="20">
+      </div>
+      <div class="su-field">
+        <label for="suBars">間隔<br><span class="su-hint">何小節ごとに上げる</span></label>
+        <input type="number" id="suBars" value="8" min="1" max="64">
+      </div>
+    </div>
+    <div class="slowup-status" id="slowupStatus"></div>
+  </div>
+
+  <div class="bottom">
+    <div class="volume-box">
+      <div class="volume-head">
+        <span class="label">音量</span>
+        <span class="value" id="volumeValue">100%</span>
+      </div>
+      <label class="sr-only" for="volumeSlider">音量</label>
+      <input type="range" id="volumeSlider" min="0" max="1.6" step="0.01" value="1">
+    </div>
+    <button type="button" class="accent-btn on" id="accentBtn">
+      1拍目<br>アクセント ON
+    </button>
+  </div>
+
+  <button type="button" class="reset-btn" id="resetBtn">設定リセット</button>
+
+  <div class="theme-row">
+    <button type="button" class="theme-dot active" data-theme="dark" title="ダーク"></button>
+    <button type="button" class="theme-dot" data-theme="parchment" title="パーチメント"></button>
+  </div>
+
+</main>
+
+<script>
+(() => {
+  "use strict";
+
+  const BPM_MIN = 40, BPM_MAX = 240;
+  const LOOKAHEAD_MS = 25, SCHEDULE_AHEAD_SEC = 0.12;
+  const FLASH_MS = 90;
+  const FAV_KEY = "metro_favs";
+  const FAV_MAX = 4;
+  const SETTINGS_KEY = "metro_settings_final_v3";
+
+  let bpm = 120;
+  let totalBeats = 4;
+  let currentBeat = 0;
+  let isRunning = false;
+  let accentOn = true;
+  let subdivision = 1;
+  let voiceOn = false;
+
+  let audioCtx = null, nextNoteTime = 0, schedulerId = null;
+  let accentBuf = null, normalBuf = null, subBuf = null;
+  let flashTimers = [], voiceTimers = [], schedulerRunId = 0;
+  let suEnabled = false, suBeatCount = 0;
+  let tapTimes = [];
+  let favsMemory = [];
+  let femaleVoice = null, voiceReady = false;
+  let currentTheme = "dark";
+  let tripletVoiceIndex = 0;
+
+  const WORDS4 = ["one","two","three","four"];
+  const WORDS3 = ["one","two","three"];
+
+  const $ = id => document.getElementById(id);
+  const bpmValueWrap = $("bpmValueWrap");
+  const bpmValueTrigger = $("bpmValueTrigger");
+  const bpmValueEl = $("bpmValue");
+  const bpmDirect = $("bpmDirect");
+  const bpmInputForm = $("bpmInputForm");
+  const bpmSlider = $("bpmSlider");
+  const beatsRow = $("beatsRow");
+  const startStopBtn = $("startStopBtn");
+  const volumeSlider = $("volumeSlider");
+  const volumeValue = $("volumeValue");
+  const accentBtn = $("accentBtn");
+  const minus10Btn = $("minus10Btn");
+  const minus1Btn = $("minus1Btn");
+  const plus1Btn = $("plus1Btn");
+  const plus10Btn = $("plus10Btn");
+  const tapBtn = $("tapBtn");
+  const favoritesRow = $("favoritesRow");
+  const favEmpty = $("favEmpty");
+  const voiceToggleBtn = $("voiceToggleBtn");
+  const slowupToggle = $("slowupToggle");
+  const slowupSettings = $("slowupSettings");
+  const slowupStatus = $("slowupStatus");
+  const suTarget = $("suTarget");
+  const suStep = $("suStep");
+  const suBars = $("suBars");
+  const appRoot = $("appRoot");
+  const resetBtn = $("resetBtn");
+
+  function getCtx() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      buildClickBufs();
+    }
+    return audioCtx;
+  }
+
+  function makeSinBuf(ctx, freq, dur) {
+    const len = Math.max(1, Math.floor(ctx.sampleRate * dur));
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) {
+      const t = i / ctx.sampleRate;
+      d[i] = Math.sin(2 * Math.PI * freq * t) * Math.exp(-t * 160);
+    }
+    return buf;
+  }
+
+  function buildClickBufs() {
+    accentBuf = makeSinBuf(audioCtx, 1760, 0.045);
+    normalBuf = makeSinBuf(audioCtx, 980, 0.04);
+    subBuf = makeSinBuf(audioCtx, 700, 0.022);
+  }
+
+  function fireBuffer(buf, time, gainVal) {
+    const ctx = getCtx();
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const g = ctx.createGain();
+    g.gain.value = gainVal;
+    src.connect(g);
+    g.connect(ctx.destination);
+    src.start(time);
+  }
+
+  function playClick(time, isAccent) {
+    const vol = parseFloat(volumeSlider.value);
+    if (isAccent) {
+      fireBuffer(accentBuf, time, vol);
+    } else {
+      fireBuffer(normalBuf, time, accentOn ? vol * 0.62 : vol);
+    }
+  }
+
+  function playSubClick(time) {
+    fireBuffer(subBuf, time, parseFloat(volumeSlider.value) * 0.38);
+  }
+
+  function initVoice() {
+    if (voiceReady) return;
+    const pick = () => {
+      const vs = speechSynthesis.getVoices();
+      if (!vs.length) return;
+      const en = vs.filter(v => v.lang && v.lang.startsWith("en"));
+      const pref = ["samantha","zira","google uk english female","fiona","karen","moira","tessa","victoria"];
+      for (const p of pref) {
+        const v = en.find(x => x.name.toLowerCase().includes(p));
+        if (v) { femaleVoice = v; break; }
+      }
+      if (!femaleVoice) femaleVoice = en[1] || en[0] || null;
+      voiceReady = true;
+    };
+    pick();
+    if (!voiceReady) speechSynthesis.addEventListener("voiceschanged", pick, { once:true });
+  }
+
+  function voiceWordForBeat(beat) {
+    if (subdivision === 3) {
+      const word = WORDS3[tripletVoiceIndex % 3];
+      tripletVoiceIndex++;
+      return word;
+    }
+    const words = totalBeats === 3 ? WORDS3 : WORDS4;
+    return words[beat] || words[0];
+  }
+
+  function scheduleVoice(time, word, isAccentBeat, runId) {
+    if (!word) return;
+    const delay = Math.max(0, (time - getCtx().currentTime) * 1000);
+    const id = setTimeout(() => {
+      if (!isRunning || schedulerRunId !== runId || !voiceOn) return;
+      const utt = new SpeechSynthesisUtterance(word);
+      utt.lang = "en-US";
+      utt.rate = 1.4;
+      utt.pitch = isAccentBeat ? 1.4 : 1.1;
+      utt.volume = Math.min(1, parseFloat(volumeSlider.value) * 0.85);
+      if (femaleVoice) utt.voice = femaleVoice;
+      speechSynthesis.speak(utt);
+    }, delay);
+    voiceTimers.push(id);
+  }
+
+  function scheduler(runId) {
+    if (!isRunning || schedulerRunId !== runId) return;
+    const ctx = getCtx();
+
+    while (nextNoteTime < ctx.currentTime + SCHEDULE_AHEAD_SEC) {
+      const beat = currentBeat;
+
+      let isAccent;
+      if (voiceOn && subdivision === 3) {
+        isAccent = accentOn && (tripletVoiceIndex % 3 === 0);
+      } else {
+        isAccent = accentOn && beat === 0;
+      }
+
+      if (voiceOn) {
+        scheduleVoice(nextNoteTime, voiceWordForBeat(beat), isAccent, runId);
+      } else {
+        playClick(nextNoteTime, isAccent);
+      }
+
+      if (subdivision > 1) {
+        const spb = 60 / bpm;
+        for (let s = 1; s < subdivision; s++) {
+          const st = nextNoteTime + (spb / subdivision) * s;
+          if (!voiceOn) playSubClick(st);
+          scheduleSubFlash(beat, s, st, runId);
+        }
+      }
+
+      scheduleFlash(beat, nextNoteTime, runId);
+
+      nextNoteTime += 60 / bpm;
+      currentBeat = (currentBeat + 1) % totalBeats;
+
+      if (suEnabled && beat === 0) {
+        suBeatCount++;
+        const bars = parseInt(suBars.value, 10) || 8;
+        if (suBeatCount >= bars) {
+          suBeatCount = 0;
+          const tgt = parseInt(suTarget.value, 10) || 160;
+          const step = parseInt(suStep.value, 10) || 5;
+          if (bpm < tgt) {
+            setBpm(Math.min(bpm + step, tgt), true);
+            updateSlowupStatus();
+            if (bpm >= tgt) slowupStatus.textContent = "🎉 目標 BPM に到達！";
+          }
+        }
+      }
+    }
+
+    schedulerId = setTimeout(() => scheduler(runId), LOOKAHEAD_MS);
+  }
+
+  function scheduleFlash(beat, time, runId) {
+    const delay = Math.max(0, (time - getCtx().currentTime) * 1000);
+    const id = setTimeout(() => {
+      if (!isRunning || schedulerRunId !== runId) return;
+      flashBeat(beat);
+    }, delay);
+    flashTimers.push(id);
+  }
+
+  function scheduleSubFlash(beat, subIdx, time, runId) {
+    const delay = Math.max(0, (time - getCtx().currentTime) * 1000);
+    const id = setTimeout(() => {
+      if (!isRunning || schedulerRunId !== runId) return;
+      const sd = beatsRow.querySelector(`.sub-dot[data-beat="${beat}"][data-sub="${subIdx}"]`);
+      if (sd) {
+        sd.classList.add("active");
+        const endId = setTimeout(() => sd.classList.remove("active"), FLASH_MS);
+        flashTimers.push(endId);
+      }
+    }, delay);
+    flashTimers.push(id);
+  }
+
+  function buildDots() {
+    beatsRow.innerHTML = "";
+
+    for (let i = 0; i < totalBeats; i++) {
+      const group = document.createElement("div");
+      group.className = "beat-group";
+      group.dataset.beatGroup = i;
+
+      const main = document.createElement("div");
+      main.className = "beat-dot main-dot" + (i === 0 && accentOn ? " accent" : "");
+      main.dataset.beat = i;
+      group.appendChild(main);
+
+      if (subdivision > 1) {
+        for (let s = 1; s < subdivision; s++) {
+          const sub = document.createElement("div");
+          sub.className = "beat-dot sub-dot";
+          sub.dataset.beat = i;
+          sub.dataset.sub = s;
+          group.appendChild(sub);
+        }
+      }
+
+      beatsRow.appendChild(group);
+    }
+  }
+
+  function flashBeat(beatIdx) {
+    const mains = beatsRow.querySelectorAll(".main-dot");
+    mains.forEach(d => {
+      const b = parseInt(d.dataset.beat, 10);
+      d.classList.toggle("active", b === beatIdx);
+      d.classList.toggle("accent", b === 0 && accentOn && b !== beatIdx);
+    });
+    const active = beatsRow.querySelector(`.main-dot[data-beat="${beatIdx}"]`);
+    if (active) {
+      const id = setTimeout(() => {
+        active.classList.remove("active");
+        if (beatIdx === 0 && accentOn) active.classList.add("accent");
+      }, FLASH_MS);
+      flashTimers.push(id);
+    }
+  }
+
+  function clearFlash() {
+    flashTimers.forEach(clearTimeout);
+    flashTimers = [];
+    beatsRow.querySelectorAll(".beat-dot").forEach(d => {
+      d.classList.remove("active");
+      if (d.classList.contains("main-dot")) {
+        d.classList.toggle("accent", parseInt(d.dataset.beat, 10) === 0 && accentOn);
+      }
+    });
+  }
+
+  function clearVoiceTimers() {
+    voiceTimers.forEach(clearTimeout);
+    voiceTimers = [];
+  }
+
+  function refreshPlaybackForStructureChange() {
+    tripletVoiceIndex = 0;
+    if (!isRunning) {
+      buildDots();
+      clearFlash();
+      return;
+    }
+    stopMetronome();
+    startMetronome();
+  }
+
+  function setBpm(v, skipSave = false) {
+    bpm = Math.max(BPM_MIN, Math.min(BPM_MAX, Math.round(Number(v))));
+    bpmValueEl.textContent = String(bpm);
+    bpmSlider.value = String(bpm);
+    if (!skipSave) saveSettings();
+  }
+
+  function updateVoiceButton() {
+    voiceToggleBtn.textContent = voiceOn ? "ボイス ON" : "ボイス OFF";
+    voiceToggleBtn.classList.toggle("on", voiceOn);
+  }
+
+  function updateVolumeLabel() {
+    volumeValue.textContent = `${Math.round(parseFloat(volumeSlider.value) * 100)}%`;
+  }
+
+  function updateAccentButton() {
+    accentBtn.classList.toggle("on", accentOn);
+    accentBtn.innerHTML = accentOn ? "1拍目<br>アクセント ON" : "1拍目<br>アクセント OFF";
+  }
+
+  function applyTheme(theme) {
+    currentTheme = theme === "parchment" ? "parchment" : "dark";
+    document.querySelectorAll(".theme-dot").forEach(dot => {
+      dot.classList.toggle("active", dot.dataset.theme === currentTheme);
+    });
+    if (currentTheme === "dark") {
+      appRoot.removeAttribute("data-theme");
+      document.body.removeAttribute("data-theme");
+    } else {
+      appRoot.setAttribute("data-theme", currentTheme);
+      document.body.setAttribute("data-theme", currentTheme);
+    }
+    saveSettings();
+  }
+
+  function updateSlowupUi() {
+    slowupToggle.checked = suEnabled;
+    slowupSettings.classList.toggle("hidden", !suEnabled);
+    if (!suEnabled || !isRunning) slowupStatus.classList.remove("visible");
+  }
+
+  function updateSlowupStatus() {
+    if (!suEnabled || !isRunning) return;
+    slowupStatus.textContent = `現在 ${bpm} BPM → 目標 ${parseInt(suTarget.value, 10) || 160} BPM`;
+    slowupStatus.classList.add("visible");
+  }
+
+  function getSettings() {
+    return {
+      bpm,
+      totalBeats,
+      accentOn,
+      subdivision,
+      voiceOn,
+      theme: currentTheme,
+      volume: parseFloat(volumeSlider.value),
+      suEnabled,
+      suTarget: parseInt(suTarget.value, 10) || 160,
+      suStep: parseInt(suStep.value, 10) || 5,
+      suBars: parseInt(suBars.value, 10) || 8
+    };
+  }
+
+  function saveSettings() {
+    try {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(getSettings()));
+    } catch (e) {}
+  }
+
+  function loadSettings() {
+    try {
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      if (!raw) return;
+      const s = JSON.parse(raw);
+
+      if (typeof s.bpm === "number") bpm = s.bpm;
+      if (s.totalBeats === 3 || s.totalBeats === 4) totalBeats = s.totalBeats;
+      if (typeof s.accentOn === "boolean") accentOn = s.accentOn;
+      if ([1,2,3,4].includes(s.subdivision)) subdivision = s.subdivision;
+      if (typeof s.voiceOn === "boolean") voiceOn = s.voiceOn;
+      if (s.theme === "parchment" || s.theme === "dark") currentTheme = s.theme;
+      if (typeof s.volume === "number") volumeSlider.value = String(Math.max(0, Math.min(1.6, s.volume)));
+      if (typeof s.suEnabled === "boolean") suEnabled = s.suEnabled;
+      if (typeof s.suTarget === "number") suTarget.value = String(Math.max(41, Math.min(240, s.suTarget)));
+      if (typeof s.suStep === "number") suStep.value = String(Math.max(1, Math.min(20, s.suStep)));
+      if (typeof s.suBars === "number") suBars.value = String(Math.max(1, Math.min(64, s.suBars)));
+    } catch (e) {}
+  }
+
+  function loadFavs() {
+    try {
+      const s = JSON.parse(localStorage.getItem(FAV_KEY) || "[]");
+      if (Array.isArray(s)) favsMemory = s;
+    } catch (e) {}
+  }
+
+  function saveFavs(arr) {
+    favsMemory = arr;
+    try { localStorage.setItem(FAV_KEY, JSON.stringify(arr)); } catch (e) {}
+  }
+
+  function renderFavs() {
+    favoritesRow.querySelectorAll(".fav-chip").forEach(el => el.remove());
+    const addBtn = $("favAddBtn");
+    const countEl = $("favCount");
+
+    if (favsMemory.length === 0) {
+      favEmpty.style.display = "inline";
+    } else {
+      favEmpty.style.display = "none";
+      favsMemory.forEach(v => {
+        const chip = document.createElement("div");
+        chip.className = "fav-chip";
+        chip.innerHTML = `<span class="fav-chip-bpm">${v}</span><button class="fav-chip-del" aria-label="${v}を削除">×</button>`;
+        chip.querySelector(".fav-chip-bpm").addEventListener("click", () => setBpm(v));
+        chip.querySelector(".fav-chip-del").addEventListener("click", e => {
+          e.stopPropagation();
+          saveFavs(favsMemory.filter(x => x !== v));
+          renderFavs();
+        });
+        favoritesRow.insertBefore(chip, addBtn);
+      });
+    }
+
+    if (countEl) countEl.textContent = `${favsMemory.length} / ${FAV_MAX}`;
+    if (addBtn) addBtn.style.display = favsMemory.length >= FAV_MAX ? "none" : "inline-flex";
+  }
+
+  function openBpmInput() {
+    bpmValueWrap.classList.add("editing");
+    bpmDirect.value = bpm;
+    requestAnimationFrame(() => {
+      bpmDirect.focus();
+      bpmDirect.select();
+    });
+  }
+
+  function closeInput(ok) {
+    if (ok) {
+      const raw = String(bpmDirect.value).trim();
+      const v = parseInt(raw, 10);
+      if (!Number.isNaN(v)) {
+        setBpm(v);
+      }
+    }
+    bpmDirect.blur();
+    bpmValueWrap.classList.remove("editing");
+  }
+
+  async function startMetronome() {
+    const ctx = getCtx();
+    if (ctx.state === "suspended") await ctx.resume();
+    if (voiceOn) initVoice();
+
+    isRunning = true;
+    schedulerRunId++;
+    currentBeat = 0;
+    tripletVoiceIndex = 0;
+    suBeatCount = 0;
+    nextNoteTime = ctx.currentTime + 0.06;
+
+    startStopBtn.classList.add("running");
+    startStopBtn.textContent = "■ ストップ";
+
+    clearFlash();
+    clearVoiceTimers();
+    if (voiceOn) speechSynthesis.cancel();
+    updateSlowupStatus();
+    scheduler(schedulerRunId);
+  }
+
+  function stopMetronome() {
+    isRunning = false;
+    schedulerRunId++;
+    if (schedulerId) {
+      clearTimeout(schedulerId);
+      schedulerId = null;
+    }
+    clearFlash();
+    clearVoiceTimers();
+    speechSynthesis.cancel();
+    startStopBtn.classList.remove("running");
+    startStopBtn.textContent = "▶ スタート";
+    slowupStatus.classList.remove("visible");
+  }
+
+  function setBeatMode(n) {
+    totalBeats = n;
+    currentBeat = 0;
+    tripletVoiceIndex = 0;
+    $("beat3Btn").classList.toggle("active", n === 3);
+    $("beat4Btn").classList.toggle("active", n === 4);
+    saveSettings();
+    refreshPlaybackForStructureChange();
+  }
+
+  function setupHold(btn, delta) {
+    let holdTimeout = null;
+    let repeatTimeout = null;
+    let pressed = false;
+    let repeated = false;
+
+    const clear = () => {
+      clearTimeout(holdTimeout);
+      clearTimeout(repeatTimeout);
+      holdTimeout = null;
+      repeatTimeout = null;
+    };
+
+    const tick = (delay) => {
+      if (!pressed) return;
+      repeated = true;
+      setBpm(bpm + delta);
+      const nextDelay = Math.max(55, Math.round(delay * 0.84));
+      repeatTimeout = setTimeout(() => tick(nextDelay), nextDelay);
+    };
+
+    btn.addEventListener("pointerdown", e => {
+      e.preventDefault();
+      pressed = true;
+      repeated = false;
+      holdTimeout = setTimeout(() => tick(150), 320);
+    });
+
+    const up = () => {
+      if (pressed && !repeated) setBpm(bpm + delta);
+      pressed = false;
+      clear();
+    };
+
+    btn.addEventListener("pointerup", up);
+    btn.addEventListener("pointercancel", () => { pressed = false; clear(); });
+    btn.addEventListener("pointerleave", () => { pressed = false; clear(); });
+  }
+
+  bpmValueTrigger.addEventListener("click", e => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!bpmValueWrap.classList.contains("editing")) openBpmInput();
+  });
+
+  bpmValueWrap.addEventListener("keydown", e => {
+    if (!bpmValueWrap.classList.contains("editing") && (e.key === "Enter" || e.key === " ")) {
+      e.preventDefault();
+      openBpmInput();
+    }
+  });
+
+  bpmInputForm.addEventListener("submit", e => {
+    e.preventDefault();
+    e.stopPropagation();
+    closeInput(true);
+  });
+
+  $("bpmConfirmBtn").addEventListener("click", e => {
+    e.preventDefault();
+    e.stopPropagation();
+    closeInput(true);
+  });
+
+  $("bpmCancelBtn").addEventListener("click", e => {
+    e.preventDefault();
+    e.stopPropagation();
+    closeInput(false);
+  });
+
+  bpmDirect.addEventListener("click", e => e.stopPropagation());
+  bpmDirect.addEventListener("input", e => e.stopPropagation());
+  bpmDirect.addEventListener("keydown", e => {
+    if (e.key === "Enter" || e.key === "NumpadEnter") {
+      e.preventDefault();
+      e.stopPropagation();
+      closeInput(true);
+      return;
+    }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      closeInput(false);
+    }
+  });
+
+  startStopBtn.addEventListener("click", () => isRunning ? stopMetronome() : startMetronome());
+
+  tapBtn.addEventListener("click", () => {
+    const now = Date.now();
+    if (tapTimes.length > 0 && now - tapTimes[tapTimes.length - 1] > 2000) tapTimes = [];
+    tapTimes.push(now);
+    if (tapTimes.length >= 2) {
+      const iv = [];
+      for (let i = 1; i < tapTimes.length; i++) iv.push(tapTimes[i] - tapTimes[i - 1]);
+      const avg = iv.reduce((a, b) => a + b, 0) / iv.length;
+      setBpm(Math.round(60000 / avg));
+    }
+    if (tapTimes.length > 8) tapTimes.shift();
+    tapBtn.style.color = "var(--accent)";
+    setTimeout(() => { tapBtn.style.color = ""; }, 120);
+  });
+
+  document.querySelectorAll(".subdiv-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      subdivision = parseInt(btn.dataset.sub, 10);
+      tripletVoiceIndex = 0;
+      document.querySelectorAll(".subdiv-btn").forEach(b => {
+        b.classList.toggle("active", b === btn);
+      });
+      saveSettings();
+      refreshPlaybackForStructureChange();
+    });
+  });
+
+  voiceToggleBtn.addEventListener("click", () => {
+    voiceOn = !voiceOn;
+    tripletVoiceIndex = 0;
+    if (voiceOn) initVoice();
+    updateVoiceButton();
+    saveSettings();
+    refreshPlaybackForStructureChange();
+  });
+
+  $("favAddBtn").addEventListener("click", () => {
+    const btn = $("favAddBtn");
+    if (favsMemory.includes(bpm)) {
+      btn.textContent = "✓ 保存済み";
+      setTimeout(() => { btn.textContent = "＋ 保存"; }, 1200);
+      return;
+    }
+    if (favsMemory.length >= FAV_MAX) return;
+    saveFavs([...favsMemory, bpm].sort((a, b) => a - b));
+    renderFavs();
+    btn.textContent = "✓ 保存!";
+    setTimeout(() => { btn.textContent = "＋ 保存"; }, 1000);
+  });
+
+  slowupToggle.addEventListener("change", () => {
+    suEnabled = slowupToggle.checked;
+    updateSlowupUi();
+    saveSettings();
+  });
+
+  [suTarget, suStep, suBars].forEach(input => {
+    input.addEventListener("input", saveSettings);
+    input.addEventListener("change", saveSettings);
+  });
+
+  volumeSlider.addEventListener("input", () => {
+    updateVolumeLabel();
+    saveSettings();
+  });
+  volumeSlider.addEventListener("change", () => {
+    updateVolumeLabel();
+    saveSettings();
+  });
+
+  accentBtn.addEventListener("click", () => {
+    accentOn = !accentOn;
+    updateAccentButton();
+    saveSettings();
+    buildDots();
+    if (!isRunning) clearFlash();
+  });
+
+  bpmSlider.addEventListener("input", e => setBpm(e.target.value));
+  bpmSlider.addEventListener("change", e => setBpm(e.target.value));
+  minus1Btn.addEventListener("click", () => setBpm(bpm - 1));
+  plus1Btn.addEventListener("click", () => setBpm(bpm + 1));
+  setupHold(minus10Btn, -10);
+  setupHold(plus10Btn, +10);
+
+  document.querySelectorAll(".theme-dot").forEach(dot => {
+    dot.addEventListener("click", () => applyTheme(dot.dataset.theme));
+  });
+
+  $("beat3Btn").addEventListener("click", () => setBeatMode(3));
+  $("beat4Btn").addEventListener("click", () => setBeatMode(4));
+
+  resetBtn.addEventListener("click", () => {
+    localStorage.removeItem(SETTINGS_KEY);
+    bpm = 120;
+    totalBeats = 4;
+    accentOn = true;
+    subdivision = 1;
+    voiceOn = false;
+    currentTheme = "dark";
+    tripletVoiceIndex = 0;
+    volumeSlider.value = "1";
+    suEnabled = false;
+    suTarget.value = "160";
+    suStep.value = "5";
+    suBars.value = "8";
+
+    updateVolumeLabel();
+    updateVoiceButton();
+    updateAccentButton();
+    updateSlowupUi();
+    document.querySelectorAll(".subdiv-btn").forEach(btn => {
+      btn.classList.toggle("active", parseInt(btn.dataset.sub, 10) === 1);
+    });
+    applyTheme("dark");
+    setBpm(120);
+    setBeatMode(4);
+    if (isRunning) refreshPlaybackForStructureChange();
+  });
+
+  document.addEventListener("keydown", e => {
+    if (bpmValueWrap.classList.contains("editing")) return;
+    if (e.code === "Space") { e.preventDefault(); isRunning ? stopMetronome() : startMetronome(); }
+    if (e.code === "ArrowUp") { e.preventDefault(); setBpm(bpm + 1); }
+    if (e.code === "ArrowDown") { e.preventDefault(); setBpm(bpm - 1); }
+    if (e.code === "ArrowRight") { e.preventDefault(); setBpm(bpm + 10); }
+    if (e.code === "ArrowLeft") { e.preventDefault(); setBpm(bpm - 10); }
+  });
+
+  loadSettings();
+  setBpm(bpm);
+  updateVolumeLabel();
+  updateAccentButton();
+  updateVoiceButton();
+  updateSlowupUi();
+  document.querySelectorAll(".subdiv-btn").forEach(btn => {
+    btn.classList.toggle("active", parseInt(btn.dataset.sub, 10) === subdivision);
+  });
+  applyTheme(currentTheme);
+  loadFavs();
+  renderFavs();
+  setBeatMode(totalBeats);
+})();
+</script>
+</body>
+</html>
