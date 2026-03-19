@@ -1098,16 +1098,17 @@
       e.preventDefault();
 
       // ✅ 値補正（ここが本体）
-      let v = parseInt(input.value, 10);
-      if (isNaN(v)) v = input.min;
+    let v = parseInt(input.value, 10);
 
-      const min = parseInt(input.min, 10);
-      const max = parseInt(input.max, 10);
+const min = parseInt(input.min, 10);
+const max = parseInt(input.max, 10);
 
-      if (v < min) v = min;
-      if (v > max) v = max;
+if (isNaN(v)) v = min;
 
-      input.value = v;
+if (v < min) v = min;
+if (v > max) v = max;
+
+input.value = v;
 
       input.blur(); // 確定
     }
