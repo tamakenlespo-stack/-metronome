@@ -1092,6 +1092,27 @@
     input.addEventListener("input", saveSettings);
     input.addEventListener("change", saveSettings);
   });
+  [suTarget, suStep, suBars].forEach(input => {
+  input.addEventListener("keydown", e => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+
+      // ✅ 値補正（ここが本体）
+      let v = parseInt(input.value, 10);
+      if (isNaN(v)) v = input.min;
+
+      const min = parseInt(input.min, 10);
+      const max = parseInt(input.max, 10);
+
+      if (v < min) v = min;
+      if (v > max) v = max;
+
+      input.value = v;
+
+      input.blur(); // 確定
+    }
+  });
+});
 
   volumeSlider.addEventListener("input", () => {
     updateVolumeLabel();
