@@ -50,7 +50,7 @@
   }
 
   .app{
-    width:min(440px,100%);
+    width:min(440px,calc(100vw - 28px));
     background:var(--panel);
     border:1px solid rgba(128,128,128,.15);
     border-radius:24px;
@@ -359,6 +359,22 @@
       padding-top:2px;
     }
     .right-panel .tap-btn{ margin-top:0; }
+  }
+
+  @media (max-width:480px){
+    body{ padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px); }
+    .app{
+      width:100vw;
+      max-width:100%;
+      min-height:100dvh;
+      border-left:none;
+      border-right:none;
+      border-radius:0;
+      padding:16px 14px;
+    }
+    .bottom{ grid-template-columns:minmax(0,1fr) minmax(128px,148px); }
+    .volume-box{ min-width:0; }
+    .accent-btn{ min-width:0; font-size:14px; }
   }
 </style>
 </head>
