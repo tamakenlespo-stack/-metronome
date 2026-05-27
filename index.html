@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="description" content="ギター練習向けのシンプルなメトロノーム。BPM調整、タップテンポ、拍子切替、アクセント、スローアップ練習に対応。" />
+<meta name="theme-color" content="#101010" />
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
 <title>ギター練習用メトロノーム</title>
 <style>
   :root{
@@ -166,6 +169,19 @@
   }
   .main-button.running{ background:var(--stop); }
   .main-button:active{ transform:scale(.985); }
+
+  .audio-error{
+    display:none;
+    margin:-4px 0 var(--section-gap);
+    padding:10px 12px;
+    border-radius:12px;
+    background:rgba(140,46,46,.16);
+    color:#ffb8b8;
+    font-size:13px;
+    line-height:1.45;
+    text-align:center;
+  }
+  .audio-error.visible{ display:block; }
 
   .tap-btn{
     width:100%; height:52px; border:none; border-radius:999px;
@@ -365,6 +381,7 @@
   </div>
 
   <button type="button" class="main-button" id="startStopBtn">▶ スタート</button>
+  <div class="audio-error" id="audioError" role="status" aria-live="polite"></div>
 
   <button type="button" class="tap-btn" id="tapBtn">♩ TAP TEMPO</button>
 
@@ -426,8 +443,8 @@
   <button type="button" class="reset-btn" id="resetBtn">設定リセット</button>
 
   <div class="theme-row">
-    <button type="button" class="theme-dot active" data-theme="dark" title="ダーク"></button>
-    <button type="button" class="theme-dot" data-theme="parchment" title="パーチメント"></button>
+    <button type="button" class="theme-dot active" data-theme="dark" title="ダーク" aria-label="ダークテーマ" aria-pressed="true"></button>
+    <button type="button" class="theme-dot" data-theme="parchment" title="パーチメント" aria-label="パーチメントテーマ" aria-pressed="false"></button>
   </div>
 
 </main>
@@ -466,6 +483,7 @@
   const bpmSlider = $("bpmSlider");
   const beatsRow = $("beatsRow");
   const startStopBtn = $("startStopBtn");
+  const audioError = $("audioError");
   const volumeSlider = $("volumeSlider");
   const volumeValue = $("volumeValue");
   const accentBtn = $("accentBtn");
@@ -486,10 +504,24 @@
   const resetBtn = $("resetBtn");
 
   function getCtx() {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) {
+      throw new Error("Web Audio API is not supported");
+    }
     if (!audioCtx) {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      audioCtx = new AudioCtx();
     }
     return audioCtx;
+  }
+
+  function showAudioError() {
+    audioError.textContent = "音声を開始できませんでした。ブラウザの音声設定やマナーモードを確認して、もう一度スタートしてください。";
+    audioError.classList.add("visible");
+  }
+
+  function clearAudioError() {
+    audioError.textContent = "";
+    audioError.classList.remove("visible");
   }
 
   function playClassicTone(time, freq, gainValue, duration=0.05) {
@@ -545,11 +577,11 @@
 
       if (suEnabled && beat === 0) {
         suBeatCount++;
-        const bars = parseInt(suBars.value, 10) || 8;
+        const bars = normalizeNumberInput(suBars, 8);
         if (suBeatCount >= bars) {
           suBeatCount = 0;
-          const tgt = parseInt(suTarget.value, 10) || 160;
-          const step = parseInt(suStep.value, 10) || 5;
+          const tgt = normalizeNumberInput(suTarget, 160);
+          const step = normalizeNumberInput(suStep, 5);
           if (bpm < tgt) {
             setBpm(Math.min(bpm + step, tgt), true);
             updateSlowupStatus();
@@ -668,6 +700,7 @@
     currentTheme = theme === "parchment" ? "parchment" : "dark";
     document.querySelectorAll(".theme-dot").forEach(dot => {
       dot.classList.toggle("active", dot.dataset.theme === currentTheme);
+      dot.setAttribute("aria-pressed", dot.dataset.theme === currentTheme ? "true" : "false");
     });
     if (currentTheme === "dark") {
       appRoot.removeAttribute("data-theme");
@@ -687,8 +720,24 @@
 
   function updateSlowupStatus() {
     if (!suEnabled || !isRunning) return;
-    slowupStatus.textContent = `現在 ${bpm} BPM → 目標 ${parseInt(suTarget.value, 10) || 160} BPM`;
+    slowupStatus.textContent = `現在 ${bpm} BPM → 目標 ${getClampedNumber(suTarget, 160)} BPM`;
     slowupStatus.classList.add("visible");
+  }
+
+  function getClampedNumber(input, fallback) {
+    const min = parseInt(input.min, 10);
+    const max = parseInt(input.max, 10);
+    let v = parseInt(input.value, 10);
+    if (Number.isNaN(v)) v = fallback;
+    if (!Number.isNaN(min)) v = Math.max(min, v);
+    if (!Number.isNaN(max)) v = Math.min(max, v);
+    return v;
+  }
+
+  function normalizeNumberInput(input, fallback) {
+    const v = getClampedNumber(input, fallback);
+    input.value = String(v);
+    return v;
   }
 
   function getSettings() {
@@ -700,9 +749,9 @@
       theme: currentTheme,
       volume: parseFloat(volumeSlider.value),
       suEnabled,
-      suTarget: parseInt(suTarget.value, 10) || 160,
-      suStep: parseInt(suStep.value, 10) || 5,
-      suBars: parseInt(suBars.value, 10) || 8
+      suTarget: getClampedNumber(suTarget, 160),
+      suStep: getClampedNumber(suStep, 5),
+      suBars: getClampedNumber(suBars, 8)
     };
   }
 
@@ -734,13 +783,21 @@
   function loadFavs() {
     try {
       const s = JSON.parse(localStorage.getItem(FAV_KEY) || "[]");
-      if (Array.isArray(s)) favsMemory = s;
+      if (Array.isArray(s)) favsMemory = normalizeFavs(s);
     } catch (e) {}
   }
 
   function saveFavs(arr) {
-    favsMemory = arr;
-    try { localStorage.setItem(FAV_KEY, JSON.stringify(arr)); } catch (e) {}
+    favsMemory = normalizeFavs(arr);
+    try { localStorage.setItem(FAV_KEY, JSON.stringify(favsMemory)); } catch (e) {}
+  }
+
+  function normalizeFavs(arr) {
+    return [...new Set(arr
+      .map(v => Math.round(Number(v)))
+      .filter(v => Number.isFinite(v) && v >= BPM_MIN && v <= BPM_MAX))]
+      .sort((a, b) => a - b)
+      .slice(0, FAV_MAX);
   }
 
   function renderFavs() {
@@ -755,9 +812,17 @@
       favsMemory.forEach(v => {
         const chip = document.createElement("div");
         chip.className = "fav-chip";
-        chip.innerHTML = `<span class="fav-chip-bpm">${v}</span><button class="fav-chip-del" aria-label="${v}を削除">×</button>`;
-        chip.querySelector(".fav-chip-bpm").addEventListener("click", () => setBpm(v));
-        chip.querySelector(".fav-chip-del").addEventListener("click", e => {
+        const bpmLabel = document.createElement("span");
+        bpmLabel.className = "fav-chip-bpm";
+        bpmLabel.textContent = String(v);
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.className = "fav-chip-del";
+        deleteBtn.setAttribute("aria-label", `${v}を削除`);
+        deleteBtn.textContent = "×";
+        chip.append(bpmLabel, deleteBtn);
+        bpmLabel.addEventListener("click", () => setBpm(v));
+        deleteBtn.addEventListener("click", e => {
           e.stopPropagation();
           saveFavs(favsMemory.filter(x => x !== v));
           renderFavs();
@@ -790,8 +855,19 @@
   }
 
   async function startMetronome() {
-    const ctx = getCtx();
-    if (ctx.state === "suspended") await ctx.resume();
+    let ctx;
+    try {
+      ctx = getCtx();
+      if (ctx.state === "suspended") await ctx.resume();
+      clearAudioError();
+    } catch (e) {
+      isRunning = false;
+      schedulerRunId++;
+      startStopBtn.classList.remove("running");
+      startStopBtn.textContent = "▶ スタート";
+      showAudioError();
+      return;
+    }
 
     isRunning = true;
     schedulerRunId++;
@@ -866,6 +942,16 @@
     btn.addEventListener("pointerup", up);
     btn.addEventListener("pointercancel", () => { pressed = false; clear(); });
     btn.addEventListener("pointerleave", () => { pressed = false; clear(); });
+    btn.addEventListener("keydown", e => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      e.stopPropagation();
+      setBpm(bpm + delta);
+    });
+  }
+
+  function isInteractiveTarget(target) {
+    return !!target.closest("button,input,select,textarea,[contenteditable='true']");
   }
 
   bpmValueTrigger.addEventListener("click", e => {
@@ -965,17 +1051,19 @@
 
   [suTarget, suStep, suBars].forEach(input => {
     input.addEventListener("input", saveSettings);
-    input.addEventListener("change", saveSettings);
+    input.addEventListener("change", () => {
+      const fallback = input === suTarget ? 160 : input === suStep ? 5 : 8;
+      normalizeNumberInput(input, fallback);
+      saveSettings();
+      updateSlowupStatus();
+    });
     input.addEventListener("keydown", e => {
       if (e.key === "Enter" || e.key === "NumpadEnter") {
         e.preventDefault();
-        let v = parseInt(input.value, 10);
-        const min = parseInt(input.min, 10);
-        const max = parseInt(input.max, 10);
-        if (isNaN(v)) v = min;
-        if (v < min) v = min;
-        if (v > max) v = max;
-        input.value = v;
+        const fallback = input === suTarget ? 160 : input === suStep ? 5 : 8;
+        normalizeNumberInput(input, fallback);
+        saveSettings();
+        updateSlowupStatus();
         input.blur();
       }
     });
@@ -1037,12 +1125,11 @@
     setBpm(120);
     setBeatMode(4);
     saveSettings();
-
-    if (isRunning) refreshPlaybackForStructureChange();
   });
 
   document.addEventListener("keydown", e => {
     if (bpmValueWrap.classList.contains("editing")) return;
+    if (isInteractiveTarget(e.target)) return;
     if (e.code === "Space") { e.preventDefault(); isRunning ? stopMetronome() : startMetronome(); }
     if (e.code === "ArrowUp") { e.preventDefault(); setBpm(bpm + 1); }
     if (e.code === "ArrowDown") { e.preventDefault(); setBpm(bpm - 1); }
